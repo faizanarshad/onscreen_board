@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 import mediapipe as mp
 import time
-from collections import deque
 import math
+from collections import deque
 
 class HandDetector:
     def __init__(self, mode=False, maxHands=2, model_complexity=1, detectionCon=0.5, trackCon=0.5):
@@ -57,99 +57,74 @@ class HandDetector:
         return fingers
 
 def create_gradient_background(width, height, color1, color2, direction='horizontal'):
-    """Create a beautiful gradient background"""
+    """Create a gradient background"""
     background = np.zeros((height, width, 3), dtype=np.uint8)
     
     if direction == 'horizontal':
         for x in range(width):
             ratio = x / width
-            color = [int(color1[i] * (1 - ratio) + color2[i] * ratio) for i in range(3)]
+            color = tuple(int(color1[i] * (1 - ratio) + color2[i] * ratio) for i in range(3))
             background[:, x] = color
     else:  # vertical
         for y in range(height):
             ratio = y / height
-            color = [int(color1[i] * (1 - ratio) + color2[i] * ratio) for i in range(3)]
+            color = tuple(int(color1[i] * (1 - ratio) + color2[i] * ratio) for i in range(3))
             background[y, :] = color
     
     return background
 
-def create_rounded_rectangle(img, x1, y1, x2, y2, color, radius=10, thickness=-1):
-    """Draw a rounded rectangle"""
-    # Draw the main rectangle
-    cv2.rectangle(img, (x1 + radius, y1), (x2 - radius, y2), color, thickness)
-    cv2.rectangle(img, (x1, y1 + radius), (x2, y2 - radius), color, thickness)
+def create_button(img, x, y, width, height, text, color, is_active=False):
+    """Create a simple button"""
+    # Button background
+    cv2.rectangle(img, (x, y), (x + width, y + height), color, -1)
     
-    # Draw the rounded corners
-    cv2.circle(img, (x1 + radius, y1 + radius), radius, color, thickness)
-    cv2.circle(img, (x2 - radius, y1 + radius), radius, color, thickness)
-    cv2.circle(img, (x1 + radius, y2 - radius), radius, color, thickness)
-    cv2.circle(img, (x2 - radius, y2 - radius), radius, color, thickness)
-
-def create_glowing_effect(img, x, y, radius, color, intensity=0.8):
-    """Create a glowing effect around a point"""
-    for r in range(radius, 0, -2):
-        alpha = intensity * (1 - r / radius)
-        glow_color = [int(c * alpha) for c in color]
-        cv2.circle(img, (x, y), r, glow_color, -1)
-
-def create_animated_button(img, x, y, width, height, text, color, is_active=False, animation_frame=0):
-    """Create an animated button with hover effects"""
-    # Base button with gradient
+    # Active state glow
     if is_active:
-        # Active state - glowing effect
-        glow_color = [min(255, c + 50) for c in color]
-        create_rounded_rectangle(img, x-2, y-2, x+width+2, y+height+2, glow_color, 12, -1)
+        cv2.rectangle(img, (x-2, y-2), (x + width+2, y + height+2), (255, 255, 255), 3)
     
-    # Main button
-    create_rounded_rectangle(img, x, y, x+width, y+height, color, 10, -1)
+    # Border
+    cv2.rectangle(img, (x, y), (x + width, y + height), (255, 255, 255), 2)
     
-    # Add subtle shadow
-    shadow_color = [max(0, c - 30) for c in color]
-    create_rounded_rectangle(img, x+2, y+2, x+width+2, y+height+2, shadow_color, 10, -1)
-    
-    # Animated border
-    if animation_frame > 0:
-        border_color = [min(255, c + 30) for c in color]
-        create_rounded_rectangle(img, x-1, y-1, x+width+1, y+height+1, border_color, 10, 2)
-    
-    # Text with shadow
-    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+    # Text
+    text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
     text_x = x + (width - text_size[0]) // 2
     text_y = y + (height + text_size[1]) // 2
-    
-    # Text shadow
-    cv2.putText(img, text, (text_x+1, text_y+1), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-    # Main text
-    cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    cv2.putText(img, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-def create_color_palette(img, x, y, colors, selected_color, swatch_size=60):
-    """Create a beautiful color palette with effects"""
-    for i, color in enumerate(colors):
-        swatch_x = x + i * (swatch_size + 10)
-        swatch_y = y
+def draw_shape(canvas, shape_type, start_point, end_point, color, thickness=2):
+    """Draw different shapes based on type"""
+    if shape_type == "Circle":
+        # Calculate center and radius
+        center_x = (start_point[0] + end_point[0]) // 2
+        center_y = (start_point[1] + end_point[1]) // 2
+        radius = int(math.sqrt((end_point[0] - start_point[0])**2 + (end_point[1] - start_point[1])**2) // 2)
+        cv2.circle(canvas, (center_x, center_y), radius, color, thickness)
         
-        # Glowing effect for selected color
-        if color == selected_color:
-            glow_radius = swatch_size // 2 + 5
-            create_glowing_effect(img, swatch_x + swatch_size//2, swatch_y + swatch_size//2, glow_radius, color, 0.6)
+    elif shape_type == "Rectangle":
+        cv2.rectangle(canvas, start_point, end_point, color, thickness)
         
-        # Main color swatch with rounded corners
-        create_rounded_rectangle(img, swatch_x, swatch_y, swatch_x + swatch_size, swatch_y + swatch_size, color, 8, -1)
+    elif shape_type == "Triangle":
+        # Calculate triangle points
+        x1, y1 = start_point
+        x2, y2 = end_point
+        x3 = x1 + (x2 - x1) // 2
+        y3 = y1 - abs(y2 - y1) // 2
         
-        # Subtle border
-        border_color = [max(0, c - 40) for c in color]
-        create_rounded_rectangle(img, swatch_x, swatch_y, swatch_x + swatch_size, swatch_y + swatch_size, border_color, 8, 2)
+        pts = np.array([[x1, y1], [x2, y2], [x3, y3]], np.int32)
+        cv2.polylines(canvas, [pts], True, color, thickness)
         
-        # Selection indicator
-        if color == selected_color:
-            cv2.circle(img, (swatch_x + swatch_size//2, swatch_y + swatch_size//2), swatch_size//3, (255, 255, 255), 3)
-            cv2.circle(img, (swatch_x + swatch_size//2, swatch_y + swatch_size//2), swatch_size//3 - 2, (0, 0, 0), 2)
+    elif shape_type == "Line":
+        cv2.line(canvas, start_point, end_point, color, thickness)
 
 def main():
-    # Initialize webcam
+    # Initialize webcam with error handling
     cap = cv2.VideoCapture(0)
-    cap.set(3, 1280)
-    cap.set(4, 720)
+    if not cap.isOpened():
+        print("Camera not available. Running in demo mode...")
+        cap = None
+    else:
+        cap.set(3, 1280)
+        cap.set(4, 720)
     
     # Initialize hand detector
     detector = HandDetector(detectionCon=0.85)
@@ -161,60 +136,72 @@ def main():
     drawColor = (255, 0, 255)
     imgCanvas = np.zeros((720, 1280, 3), np.uint8)
     
-    # Beautiful color palette
-    colors = [
-        (255, 0, 0),    # Red
-        (255, 165, 0),  # Orange
-        (255, 255, 0),  # Yellow
-        (0, 255, 0),    # Green
-        (0, 255, 255),  # Cyan
-        (0, 0, 255),    # Blue
-        (128, 0, 128),  # Purple
-        (255, 192, 203), # Pink
-        (255, 255, 255), # White
-        (0, 0, 0)       # Black
-    ]
-    
-    # Brush sizes with beautiful names
-    brushSizes = [5, 10, 15, 25, 35]
-    brushNames = ["Fine", "Thin", "Medium", "Thick", "Bold"]
+    # Enhanced features
+    brushSizes = [5, 10, 15, 20, 25, 30]
     currentBrushSize = 2
+    eraserSizes = [20, 30, 40, 50, 60, 70]
+    currentEraserSize = 3
     
-    # Tool modes
-    TOOL_BRUSH = "brush"
-    TOOL_ERASER = "eraser"
-    TOOL_SHAPE = "shape"
-    current_tool = TOOL_BRUSH
-    
-    # Animation variables
-    animation_frame = 0
-    hover_effects = {}
-    
-    # Undo/Redo functionality
+    # Undo/Redo system
     undoStack = deque(maxlen=20)
     redoStack = deque(maxlen=20)
     
-    # UI Setup
-    header_height = 180
-    header_width = 1280
+    # Current tool
+    drawing_mode = True  # True for brush, False for eraser
+    shape_mode = False   # True for shape drawing
+    selected_shape = None
+    shape_start_point = None
     
-    # Beautiful gradient colors
-    header_gradient1 = (45, 45, 85)   # Dark blue
-    header_gradient2 = (85, 45, 85)   # Purple
-    
-    # Tool button definitions
-    tools = [
-        {"name": "Brush", "tool": TOOL_BRUSH, "color": (0, 255, 100), "icon": "B"},
-        {"name": "Eraser", "tool": TOOL_ERASER, "color": (255, 100, 100), "icon": "E"},
-        {"name": "Shape", "tool": TOOL_SHAPE, "color": (100, 100, 255), "icon": "S"}
+    # Beautiful colors palette
+    colors = [
+        (0, 0, 255),      # Red
+        (0, 255, 0),      # Green
+        (255, 0, 0),      # Blue
+        (0, 255, 255),    # Yellow
+        (255, 0, 255),    # Magenta
+        (255, 255, 0),    # Cyan
+        (255, 255, 255),  # White
+        (255, 165, 0),    # Orange
+        (128, 0, 128),    # Purple
+        (0, 255, 128)     # Lime
     ]
     
-    # Action buttons
-    actions = [
-        {"name": "Clear", "color": (255, 150, 0), "icon": "C"},
-        {"name": "Save", "color": (0, 200, 100), "icon": "S"},
-        {"name": "Undo", "color": (200, 100, 200), "icon": "U"},
-        {"name": "Redo", "color": (100, 200, 200), "icon": "R"}
+    # NEW LAYOUT: Colors on top, buttons on right, shapes on left
+    header_height = 100
+    header_width = 1280
+    
+    # Color palette on top
+    color_start_x = 50
+    color_y = 20
+    color_size = 50
+    color_spacing = 15
+    
+    # Right side buttons (vertical)
+    button_width = 120
+    button_height = 50
+    button_spacing = 15
+    right_button_x = 1100
+    
+    # Left side shapes (vertical)
+    shape_width = 120
+    shape_height = 50
+    shape_spacing = 15
+    left_shape_x = 20
+    
+    # Tool buttons
+    tools = [
+        {"name": "Brush", "color": (0, 255, 100)},
+        {"name": "Eraser", "color": (255, 100, 100)},
+        {"name": "Clear", "color": (255, 150, 0)},
+        {"name": "Save", "color": (0, 200, 100)}
+    ]
+    
+    # Shape options
+    shapes = [
+        {"name": "Circle", "color": (255, 100, 100)},
+        {"name": "Rectangle", "color": (100, 255, 100)},
+        {"name": "Triangle", "color": (100, 100, 255)},
+        {"name": "Line", "color": (255, 255, 100)}
     ]
     
     def saveCanvasState():
@@ -231,154 +218,186 @@ def main():
             undoStack.append(imgCanvas.copy())
             imgCanvas[:] = redoStack.pop()
     
+    # Save initial state
+    saveCanvasState()
+    
     while True:
-        success, img = cap.read()
-        if not success:
-            print("Failed to grab frame")
-            break
+        # Get camera frame or create demo frame
+        if cap is not None:
+            success, img = cap.read()
+            if not success:
+                print("Failed to grab frame. Creating demo frame...")
+                img = create_gradient_background(1280, 720, (50, 50, 100), (100, 50, 150), 'vertical')
+        else:
+            # Demo mode - create a static frame
+            img = create_gradient_background(1280, 720, (50, 50, 100), (100, 50, 150), 'vertical')
+            # Add demo text
+            cv2.putText(img, "DEMO MODE - Camera not available", (400, 400), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.putText(img, "Use mouse to interact with buttons", (400, 450), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
             
         img = cv2.flip(img, 1)  # Mirror the image
         
-        # Create beautiful header with gradient
-        header = create_gradient_background(header_width, header_height, header_gradient1, header_gradient2, 'horizontal')
-        
-        # Add decorative elements to header
-        # Floating particles effect
-        for i in range(5):
-            x = int((time.time() * 50 + i * 200) % header_width)
-            y = int(50 + 20 * math.sin(time.time() * 2 + i))
-            cv2.circle(header, (x, y), 3, (255, 255, 255, 100), -1)
-        
-        # Title with shadow and glow
-        title = "Beautiful Virtual Painter"
-        title_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
-        title_x = (header_width - title_size[0]) // 2
-        title_y = 80
-        
-        # Title glow effect
-        for i in range(3):
-            glow_color = (100 + i * 50, 100 + i * 50, 255)
-            cv2.putText(header, title, (title_x + i, title_y + i), cv2.FONT_HERSHEY_SIMPLEX, 1.5, glow_color, 3)
-        
-        # Main title
-        cv2.putText(header, title, (title_x, title_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
-        
-        # Create color palette
-        create_color_palette(header, 50, 100, colors, drawColor, 50)
-        
-        # Create tool buttons
-        tool_x = 650
-        tool_y = 100
-        for i, tool in enumerate(tools):
-            button_x = tool_x + i * 120
-            button_y = tool_y
-            is_active = current_tool == tool["tool"]
+        # Find hands only if camera is available
+        if cap is not None:
+            img = detector.findHands(img)
+            lmList = detector.findPosition(img, draw=False)
             
-            # Check for hover effect
-            hover_key = f"tool_{i}"
-            if hover_key in hover_effects:
-                animation_frame = hover_effects[hover_key]
-            else:
-                animation_frame = 0
-            
-            create_animated_button(header, button_x, button_y, 100, 50, 
-                                 f"{tool['icon']} {tool['name']}", tool["color"], is_active, animation_frame)
-        
-        # Create action buttons
-        action_x = 1000
-        action_y = 100
-        for i, action in enumerate(actions):
-            button_x = action_x + i * 120
-            button_y = action_y
-            
-            create_animated_button(header, button_x, button_y, 100, 50, 
-                                 f"{action['icon']} {action['name']}", action["color"])
-        
-        # Size indicator with beautiful design
-        size_x = 50
-        size_y = 160
-        size_color = (255, 255, 255)
-        size_text = f"Size: {brushNames[currentBrushSize]} ({brushSizes[currentBrushSize]}px)"
-        
-        # Size indicator background
-        create_rounded_rectangle(header, size_x, size_y, size_x + 200, size_y + 30, (0, 0, 0, 100), 15, -1)
-        cv2.putText(header, size_text, (size_x + 10, size_y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, size_color, 2)
-        
-        # Find hands
-        img = detector.findHands(img)
-        lmList = detector.findPosition(img, draw=False)
-        
-        if len(lmList) != 0:
-            x1, y1 = lmList[8][1], lmList[8][2]  # Index finger tip
-            x2, y2 = lmList[12][1], lmList[12][2]  # Middle finger tip
-            
-            # Check which fingers are up
-            fingers = detector.fingersUp()
-            
-            # Selection mode - Two fingers up
-            if fingers[1] and fingers[2]:
-                xp, yp = 0, 0
+            if len(lmList) != 0:
+                x1, y1 = lmList[8][1], lmList[8][2]  # Index finger tip
+                x2, y2 = lmList[12][1], lmList[12][2]  # Middle finger tip
                 
-                # Check if clicking on color palette
-                if y1 < header_height and 50 <= x1 <= 650:
-                    color_index = (x1 - 50) // 60
-                    if 0 <= color_index < len(colors):
-                        drawColor = colors[color_index]
-                        current_tool = TOOL_BRUSH
+                # Check which fingers are up
+                fingers = detector.fingersUp()
                 
-                # Check if clicking on tool buttons
-                if y1 < header_height and tool_y <= y1 <= tool_y + 50:
-                    for i, tool in enumerate(tools):
-                        button_x = tool_x + i * 120
-                        if button_x <= x1 <= button_x + 100:
-                            current_tool = tool["tool"]
-                            hover_effects[f"tool_{i}"] = 10
-                
-                # Check if clicking on action buttons
-                if y1 < header_height and action_y <= y1 <= action_y + 50:
-                    for i, action in enumerate(actions):
-                        button_x = action_x + i * 120
-                        if button_x <= x1 <= button_x + 100:
-                            if action["name"] == "Clear":
-                                saveCanvasState()
+                # Selection mode - Two fingers up
+                if fingers[1] and fingers[2]:
+                    xp, yp = 0, 0
+                    shape_start_point = None  # Reset shape drawing
+                    
+                    # Check if clicking on color swatches (top)
+                    if y1 < header_height:
+                        for i, color in enumerate(colors):
+                            color_x = color_start_x + i * (color_size + color_spacing)
+                            if (color_x < x1 < color_x + color_size and 
+                                color_y < y1 < color_y + color_size):
+                                drawColor = color
+                                drawing_mode = True
+                                shape_mode = False
+                    
+                    # Check if clicking on right side buttons
+                    if x1 > right_button_x - button_width:
+                        button_index = (y1 - header_height) // (button_height + button_spacing)
+                        
+                        if 0 <= button_index < len(tools):
+                            if button_index == 0:  # Brush
+                                drawing_mode = True
+                                shape_mode = False
+                                brushThickness = brushSizes[currentBrushSize]
+                            elif button_index == 1:  # Eraser
+                                drawing_mode = False
+                                shape_mode = False
+                                eraserThickness = eraserSizes[currentEraserSize]
+                            elif button_index == 2:  # Clear
                                 imgCanvas = np.zeros((720, 1280, 3), np.uint8)
+                                saveCanvasState()
                                 print("Canvas cleared!")
-                            elif action["name"] == "Save":
+                            elif button_index == 3:  # Save
                                 timestamp = int(time.time())
                                 filename = f"beautiful_painting_{timestamp}.png"
                                 cv2.imwrite(filename, imgCanvas)
                                 print(f"Painting saved as {filename}")
-                            elif action["name"] == "Undo":
-                                undo()
-                                print("Undo performed!")
-                            elif action["name"] == "Redo":
-                                redo()
-                                print("Redo performed!")
+                    
+                    # Check if clicking on left side shapes
+                    if x1 < left_shape_x + shape_width:
+                        shape_index = (y1 - header_height) // (shape_height + shape_spacing)
+                        if 0 <= shape_index < len(shapes):
+                            selected_shape = shapes[shape_index]["name"]
+                            shape_mode = True
+                            drawing_mode = False
+                            print(f"Selected shape: {selected_shape}")
+                    
+                    cv2.circle(img, (x1, y1), 15, drawColor, cv2.FILLED)
                 
-                # Beautiful cursor indicator
-                cv2.circle(img, (x1, y1), 20, drawColor, -1)
-                cv2.circle(img, (x1, y1), 25, (255, 255, 255), 2)
-            
-            # Drawing mode - Index finger up
-            elif fingers[1] and not fingers[2]:
-                # Beautiful drawing cursor
-                cv2.circle(img, (x1, y1), 15, drawColor, -1)
-                cv2.circle(img, (x1, y1), 20, (255, 255, 255), 2)
-                
-                if xp == 0 and yp == 0:
+                # Drawing mode - Index finger up
+                elif fingers[1] and not fingers[2]:
+                    cv2.circle(img, (x1, y1), 15, drawColor, cv2.FILLED)
+                    
+                    if xp == 0 and yp == 0:
+                        xp, yp = x1, y1
+                        if shape_mode:
+                            shape_start_point = (x1, y1)
+                    
+                    if drawing_mode:
+                        cv2.line(imgCanvas, (xp, yp), (x1, y1), drawColor, brushThickness)
+                    elif shape_mode and selected_shape:
+                        # For shapes, draw immediately when moving
+                        if shape_start_point:
+                            # Clear previous shape by redrawing canvas
+                            temp_canvas = imgCanvas.copy()
+                            # Draw the shape
+                            draw_shape(temp_canvas, selected_shape, shape_start_point, (x1, y1), drawColor, 3)
+                            # Update the main canvas
+                            imgCanvas[:] = temp_canvas[:]
+                    else:
+                        # Eraser: create a mask and remove drawn content
+                        mask = np.zeros(imgCanvas.shape[:2], dtype=np.uint8)
+                        cv2.line(mask, (xp, yp), (x1, y1), 255, eraserThickness)
+                        imgCanvas[mask == 255] = [0, 0, 0]
+                    
                     xp, yp = x1, y1
                 
-                if current_tool == TOOL_BRUSH:
-                    cv2.line(imgCanvas, (xp, yp), (x1, y1), drawColor, brushThickness)
-                elif current_tool == TOOL_ERASER:
-                    mask = np.zeros(imgCanvas.shape[:2], dtype=np.uint8)
-                    cv2.line(mask, (xp, yp), (x1, y1), 255, eraserThickness)
-                    imgCanvas[mask == 255] = [0, 0, 0]
-                
-                xp, yp = x1, y1
+                # Shape completion - When finger is lifted (no fingers up)
+                elif not fingers[1] and shape_mode and selected_shape and shape_start_point:
+                    # Save the completed shape
+                    saveCanvasState()
+                    print(f"Completed {selected_shape} shape!")
+                    shape_start_point = None
+                    xp, yp = 0, 0
+        
+        # Create beautiful header with colors on top
+        header = create_gradient_background(header_width, header_height, (80, 40, 120), (120, 60, 180), 'horizontal')
+        
+        # Draw color palette on top
+        for i, color in enumerate(colors):
+            color_x = color_start_x + i * (color_size + color_spacing)
+            
+            # Create gradient swatch
+            swatch = create_gradient_background(color_size, color_size, 
+                                              tuple(max(0, c - 30) for c in color), 
+                                              color, 'vertical')
+            
+            # Add glow if selected
+            if color == drawColor:
+                glow_color = tuple(min(255, c + 80) for c in color)
+                cv2.rectangle(header, (color_x-3, color_y-3), 
+                             (color_x+color_size+3, color_y+color_size+3), 
+                             glow_color, 3)
+            
+            # Place swatch
+            header[color_y:color_y+color_size, color_x:color_x+color_size] = swatch
+            
+            # Add border
+            cv2.rectangle(header, (color_x, color_y), 
+                         (color_x+color_size, color_y+color_size), 
+                         (255, 255, 255), 2)
         
         # Combine header with main image
         img[0:header_height, 0:header_width] = header
+        
+        # Draw right side buttons (vertical) - on the main image
+        button_y_start = header_height + 20
+        for i, tool in enumerate(tools):
+            button_y = button_y_start + i * (button_height + button_spacing)
+            is_active = (i == 0 and drawing_mode) or (i == 1 and not drawing_mode and not shape_mode)
+            create_button(img, right_button_x, button_y, button_width, button_height, 
+                         tool["name"], tool["color"], is_active)
+        
+        # Draw left side shapes (vertical) - on the main image
+        shape_y_start = header_height + 20
+        for i, shape in enumerate(shapes):
+            shape_y = shape_y_start + i * (shape_height + shape_spacing)
+            is_active = shape_mode and selected_shape == shape["name"]
+            create_button(img, left_shape_x, shape_y, shape_width, shape_height, 
+                         shape["name"], shape["color"], is_active)
+        
+        # Beautiful title with glow effect
+        title = "Beautiful Virtual Painter"
+        title_size = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
+        title_x = (header_width - title_size[0]) // 2
+        title_y = header_height // 2 + 10
+        
+        # Title shadow
+        cv2.putText(header, title, (title_x + 2, title_y + 2), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 3)
+        # Title glow
+        cv2.putText(header, title, (title_x, title_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 0), 3)
+        
+        # Add animated particles to header
+        for i in range(5):
+            particle_x = int(50 + (time.time() * 50 + i * 100) % (header_width - 100))
+            particle_y = int(20 + 10 * np.sin(time.time() * 2 + i))
+            cv2.circle(header, (particle_x, particle_y), 3, (255, 255, 255), -1)
         
         # Blend canvas with image
         imgGray = cv2.cvtColor(imgCanvas, cv2.COLOR_BGR2GRAY)
@@ -387,30 +406,23 @@ def main():
         img = cv2.bitwise_and(img, imgInv)
         img = cv2.bitwise_or(img, imgCanvas)
         
-        # Beautiful status indicator
-        status_x = 10
-        status_y = header_height + 30
+        # Display current tool and size
+        if drawing_mode:
+            mode_text = f"Brush Mode (Size: {brushThickness})"
+            mode_color = (0, 255, 0)
+        elif shape_mode and selected_shape:
+            mode_text = f"Shape Mode: {selected_shape}"
+            mode_color = (255, 0, 255)
+        else:
+            mode_text = f"Eraser Mode (Size: {eraserThickness})"
+            mode_color = (0, 0, 255)
         
-        # Status background
-        status_bg_color = (0, 0, 0, 150)
-        cv2.rectangle(img, (status_x, status_y), (status_x + 400, status_y + 40), status_bg_color, -1)
-        cv2.rectangle(img, (status_x, status_y), (status_x + 400, status_y + 40), (255, 255, 255), 2)
+        cv2.putText(img, mode_text, (10, header_height + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, mode_color, 2)
         
-        # Status text
-        tool_names = {
-            TOOL_BRUSH: "🖌️ Brush Mode",
-            TOOL_ERASER: "🧽 Eraser Mode",
-            TOOL_SHAPE: "🔷 Shape Mode"
-        }
-        
-        status_text = f"{tool_names.get(current_tool, 'Unknown')} | Size: {brushNames[currentBrushSize]}"
-        cv2.putText(img, status_text, (status_x + 10, status_y + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        
-        # Animate hover effects
-        for key in list(hover_effects.keys()):
-            hover_effects[key] = max(0, hover_effects[key] - 1)
-            if hover_effects[key] == 0:
-                del hover_effects[key]
+        # Add shape drawing instructions
+        if shape_mode and selected_shape:
+            instruction_text = f"Draw {selected_shape}: Point and drag to draw, lift finger to complete"
+            cv2.putText(img, instruction_text, (10, header_height + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         # Show the image
         cv2.imshow("Beautiful Virtual Painter", img)
@@ -419,7 +431,8 @@ def main():
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     
-    cap.release()
+    if cap is not None:
+        cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
