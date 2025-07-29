@@ -1,0 +1,5 @@
+opencv-python<4.9.0
+numpy<2.0.0
+mediapipe
+SpeechRecognition
+pyaudio 
